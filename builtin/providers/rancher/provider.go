@@ -2,7 +2,6 @@ package rancher
 
 import (
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
 	"net/url"
 	"os"
@@ -57,6 +56,7 @@ func Provider() terraform.ResourceProvider {
 			"rancher_registry":            resourceRancherRegistry(),
 			"rancher_registry_credential": resourceRancherRegistryCredential(),
 			"rancher_stack":               resourceRancherStack(),
+			"rancher_volume":              resourceRancherVolume(),
 		},
 
 		ConfigureFunc: providerConfigure,
@@ -88,7 +88,7 @@ func providerConfigure(d *schema.ResourceData) (interface{}, error) {
 			return config, err
 		}
 
-		if apiURL == "" && config.URL != "" {
+		if apiURL == "" {
 			u, err := url.Parse(config.URL)
 			if err != nil {
 				return config, err
@@ -103,10 +103,6 @@ func providerConfigure(d *schema.ResourceData) (interface{}, error) {
 		if secretKey == "" {
 			secretKey = config.SecretKey
 		}
-	}
-
-	if apiURL == "" {
-		return &Config{}, fmt.Errorf("No api_url provided")
 	}
 
 	config := &Config{

@@ -79,3 +79,17 @@ func (c *Config) CatalogClient() (*catalog.RancherClient, error) {
 
 	return client, nil
 }
+
+// VolumeClient creates a Rancher client scoped to a Volume's API
+func (c *Config) VolumeClient(id string) (*rancherClient.RancherClient, error) {
+	client, err := c.GlobalClient()
+	if err != nil {
+		return nil, err
+	}
+	volume, err := client.Volume.ById(id)
+	if err != nil {
+		return nil, err
+	}
+
+	return c.EnvironmentClient(volume.AccountId)
+}
