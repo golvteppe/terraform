@@ -3,7 +3,7 @@ package rancher
 import (
 	"log"
 
-	rancherClient "github.com/rancher/go-rancher/client"
+	rancherClient "github.com/golvteppe/go-rancher/client"
 	"github.com/raphink/go-rancher/catalog"
 )
 

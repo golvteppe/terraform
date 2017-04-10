@@ -6,10 +6,10 @@ import (
 	"strings"
 	"time"
 
+	rancherClient "github.com/golvteppe/go-rancher/client"
 	"github.com/hashicorp/terraform/helper/resource"
 	"github.com/hashicorp/terraform/helper/schema"
 	"github.com/hashicorp/terraform/helper/validation"
-	rancherClient "github.com/rancher/go-rancher/client"
 )
 
 func resourceRancherEnvironment() *schema.Resource {

@@ -3,7 +3,7 @@ package rancher
 import (
 	"strings"
 
-	"github.com/rancher/go-rancher/client"
+	"github.com/golvteppe/go-rancher/client"
 )
 
 const (

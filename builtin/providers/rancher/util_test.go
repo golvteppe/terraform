@@ -3,7 +3,7 @@ package rancher
 import (
 	"testing"
 
-	"github.com/rancher/go-rancher/client"
+	"github.com/golvteppe/go-rancher/client"
 )
 
 var idTests = []struct {

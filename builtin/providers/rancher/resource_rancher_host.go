@@ -5,9 +5,9 @@ import (
 	"log"
 	"time"
 
+	rancher "github.com/golvteppe/go-rancher/client"
 	"github.com/hashicorp/terraform/helper/resource"
 	"github.com/hashicorp/terraform/helper/schema"
-	rancher "github.com/rancher/go-rancher/client"
 )
 
 // ro_labels are used internally by Rancher

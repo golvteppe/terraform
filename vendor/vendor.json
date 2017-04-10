@@ -2798,7 +2798,7 @@
 		},
 		{
 			"checksumSHA1": "qn7N2kqSpKKi3YglZNyoQxp4aKs=",
-			"path": "github.com/rancher/go-rancher/client",
+			"path": "github.com/golvteppe/go-rancher/client",
 			"revision": "bdb84801f2cf82be73e210ff586c531b07c83c42",
 			"revisionTime": "2016-07-27T23:27:26Z"
 		},

@@ -5,9 +5,9 @@ import (
 	"testing"
 	"time"
 
+	rancherClient "github.com/golvteppe/go-rancher/client"
 	"github.com/hashicorp/terraform/helper/resource"
 	"github.com/hashicorp/terraform/terraform"
-	rancherClient "github.com/rancher/go-rancher/client"
 )
 
 func TestAccRancherStack_basic(t *testing.T) {
