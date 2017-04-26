@@ -81,14 +81,12 @@ func resourceRancherStack() *schema.Resource {
 				Optional: true,
 			},
 			"rendered_docker_compose": {
-				Type:             schema.TypeString,
-				Computed:         true,
-				DiffSuppressFunc: suppressComposeDiff,
+				Type:     schema.TypeString,
+				Computed: true,
 			},
 			"rendered_rancher_compose": {
-				Type:             schema.TypeString,
-				Computed:         true,
-				DiffSuppressFunc: suppressComposeDiff,
+				Type:     schema.TypeString,
+				Computed: true,
 			},
 		},
 	}
