@@ -1,10 +1,6 @@
 package rancher
 
-import (
-	"testing"
-
-	"github.com/rancher/go-rancher/client"
-)
+import "testing"
 
 var idTests = []struct {
 	id         string
@@ -38,25 +34,6 @@ func TestRemovedState(t *testing.T) {
 		removed := removed(tt.state)
 		if removed != tt.removed {
 			t.Errorf("removed(%s) => %t, wants %t", tt.state, removed, tt.removed)
-		}
-	}
-}
-
-var orchestrationTests = []struct {
-	project       *client.Project
-	orchestration string
-}{
-	{&client.Project{}, "cattle"},
-	{&client.Project{Swarm: true}, "swarm"},
-	{&client.Project{Mesos: true}, "mesos"},
-	{&client.Project{Kubernetes: true}, "kubernetes"},
-}
-
-func TestActiveOrchestration(t *testing.T) {
-	for _, tt := range orchestrationTests {
-		orchestration := getActiveOrchestration(tt.project)
-		if orchestration != tt.orchestration {
-			t.Errorf("getActiveOrchestration(%+v) => %s, wants %s", tt.project, orchestration, tt.orchestration)
 		}
 	}
 }

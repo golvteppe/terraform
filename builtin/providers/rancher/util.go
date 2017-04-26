@@ -3,29 +3,13 @@ package rancher
 import (
 	"strings"
 
-	"github.com/rancher/go-rancher/client"
+	"github.com/golvteppe/go-rancher/v2"
 )
 
 const (
 	stateRemoved = "removed"
 	statePurged  = "purged"
 )
-
-// GetActiveOrchestration get the name of the active orchestration for a environment
-func getActiveOrchestration(project *client.Project) string {
-	orch := "cattle"
-
-	switch {
-	case project.Swarm:
-		orch = "swarm"
-	case project.Mesos:
-		orch = "mesos"
-	case project.Kubernetes:
-		orch = "kubernetes"
-	}
-
-	return orch
-}
 
 func removed(state string) bool {
 	return state == stateRemoved || state == statePurged

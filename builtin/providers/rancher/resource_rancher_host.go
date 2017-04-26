@@ -5,9 +5,10 @@ import (
 	"log"
 	"time"
 
+	rancher "github.com/golvteppe/go-rancher/v2"
 	"github.com/hashicorp/terraform/helper/resource"
 	"github.com/hashicorp/terraform/helper/schema"
-	rancher "github.com/rancher/go-rancher/client"
+	"github.com/mitchellh/mapstructure"
 )
 
 // ro_labels are used internally by Rancher
@@ -34,10 +35,6 @@ func resourceRancherHost() *schema.Resource {
 				Type:     schema.TypeString,
 				Computed: true,
 			},
-			"name": &schema.Schema{
-				Type:     schema.TypeString,
-				Required: true,
-			},
 			"description": &schema.Schema{
 				Type:     schema.TypeString,
 				Optional: true,
@@ -54,6 +51,14 @@ func resourceRancherHost() *schema.Resource {
 				Type:     schema.TypeMap,
 				Optional: true,
 			},
+			"driver": {
+				Type:     schema.TypeString,
+				Optional: true,
+			},
+			"driver_config": {
+				Type:     schema.TypeMap,
+				Optional: true,
+			},
 		},
 	}
 }
@@ -65,24 +70,57 @@ func resourceRancherHostCreate(d *schema.ResourceData, meta interface{}) error {
 		return err
 	}
 
-	hosts, _ := client.Host.List(NewListOpts())
 	hostname := d.Get("hostname").(string)
-	var host rancher.Host
+	description := d.Get("description").(string)
+	labels := d.Get("labels").(map[string]interface{})
+	driver := d.Get("driver").(string)
+	driverConfigData := d.Get("driver_config").(map[string]interface{})
 
-	for _, h := range hosts.Data {
-		if h.Hostname == hostname {
-			host = h
-			break
-		}
+	var (
+		digitaloceanConfig  rancher.DigitaloceanConfig
+		vmwarevsphereConfig rancher.VmwarevsphereConfig
+	)
+
+	hostData := map[string]interface{}{
+		"hostname":    &hostname,
+		"description": &description,
+		"labels":      &labels,
 	}
 
-	if host.Hostname == "" {
-		return fmt.Errorf("Failed to find host %s", hostname)
+	switch driver {
+	case "digitalocean":
+		mapstructure.Decode(driverConfigData, &digitaloceanConfig)
+		hostData["digitaloceanConfig"] = &digitaloceanConfig
+	case "vmwarevsphere":
+		mapstructure.Decode(driverConfigData, &vmwarevsphereConfig)
+		hostData["vmwarevsphereConfig"] = &vmwarevsphereConfig
+	default:
+		return fmt.Errorf("Invalid driver specified: %s", err)
 	}
 
-	d.SetId(host.Id)
+	var newHost rancher.Host
+	if err := client.Create("host", hostData, &newHost); err != nil {
+		return err
+	}
 
-	return resourceRancherHostUpdate(d, meta)
+	stateConf := &resource.StateChangeConf{
+		Pending:    []string{"creating", "provisioning", "bootstrapping", "active", "activating"},
+		Target:     []string{"active"},
+		Refresh:    HostStateRefreshFunc(client, newHost.Id),
+		Timeout:    10 * time.Minute,
+		Delay:      1 * time.Second,
+		MinTimeout: 3 * time.Second,
+	}
+	_, waitErr := stateConf.WaitForState()
+	if waitErr != nil {
+		return fmt.Errorf(
+			"Error waiting for host (%s) to be created: %s", newHost.Id, waitErr)
+	}
+
+	d.SetId(newHost.Id)
+	log.Printf("[INFO] Host ID: %s", d.Id())
+
+	return resourceRancherHostRead(d, meta)
 }
 
 func resourceRancherHostRead(d *schema.ResourceData, meta interface{}) error {
@@ -160,13 +198,41 @@ func resourceRancherHostDelete(d *schema.ResourceData, meta interface{}) error {
 		return err
 	}
 
+	// Step 1: Deactivate
+	if _, e := client.Host.ActionDeactivate(host); e != nil {
+		return fmt.Errorf("Error deactivating Host: %s", err)
+	}
+
+	log.Printf("[DEBUG] Waiting for host (%s) to be deactivated", id)
+
+	stateConf := &resource.StateChangeConf{
+		Pending:    []string{"active", "inactive", "deactivating"},
+		Target:     []string{"inactive"},
+		Refresh:    HostStateRefreshFunc(client, id),
+		Timeout:    10 * time.Minute,
+		Delay:      1 * time.Second,
+		MinTimeout: 3 * time.Second,
+	}
+
+	_, waitErr := stateConf.WaitForState()
+	if waitErr != nil {
+		return fmt.Errorf(
+			"Error waiting for host (%s) to be deactivated: %s", id, waitErr)
+	}
+
+	// Update resource to reflect its state
+	host, err = client.Host.ById(id)
+	if err != nil {
+		return fmt.Errorf("Failed to refresh state of deactivated host (%s): %s", id, err)
+	}
+
 	if err := client.Host.Delete(host); err != nil {
 		return fmt.Errorf("Error deleting Host: %s", err)
 	}
 
 	log.Printf("[DEBUG] Waiting for host (%s) to be removed", id)
 
-	stateConf := &resource.StateChangeConf{
+	stateConf = &resource.StateChangeConf{
 		Pending:    []string{"active", "removed", "removing"},
 		Target:     []string{"removed"},
 		Refresh:    HostStateRefreshFunc(client, id),
@@ -175,7 +241,7 @@ func resourceRancherHostDelete(d *schema.ResourceData, meta interface{}) error {
 		MinTimeout: 3 * time.Second,
 	}
 
-	_, waitErr := stateConf.WaitForState()
+	_, waitErr = stateConf.WaitForState()
 	if waitErr != nil {
 		return fmt.Errorf(
 			"Error waiting for host (%s) to be removed: %s", id, waitErr)

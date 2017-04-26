@@ -57,6 +57,7 @@ func Provider() terraform.ResourceProvider {
 			"rancher_registry":            resourceRancherRegistry(),
 			"rancher_registry_credential": resourceRancherRegistryCredential(),
 			"rancher_stack":               resourceRancherStack(),
+			"rancher_volume":              resourceRancherVolume(),
 		},
 
 		ConfigureFunc: providerConfigure,
@@ -110,7 +111,7 @@ func providerConfigure(d *schema.ResourceData) (interface{}, error) {
 	}
 
 	config := &Config{
-		APIURL:    apiURL + "/v1",
+		APIURL:    apiURL,
 		AccessKey: accessKey,
 		SecretKey: secretKey,
 	}

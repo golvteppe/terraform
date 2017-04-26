@@ -8,10 +8,10 @@ import (
 	"time"
 
 	compose "github.com/docker/libcompose/config"
+	rancherClient "github.com/golvteppe/go-rancher/v2"
 	"github.com/hashicorp/terraform/helper/resource"
 	"github.com/hashicorp/terraform/helper/schema"
 	"github.com/hashicorp/terraform/helper/validation"
-	rancherClient "github.com/rancher/go-rancher/client"
 )
 
 func resourceRancherStack() *schema.Resource {
@@ -71,17 +71,24 @@ func resourceRancherStack() *schema.Resource {
 				Optional: true,
 				Computed: true,
 			},
+			"system": {
+				Type:     schema.TypeBool,
+				Optional: true,
+				Computed: true,
+			},
 			"finish_upgrade": {
 				Type:     schema.TypeBool,
 				Optional: true,
 			},
 			"rendered_docker_compose": {
-				Type:     schema.TypeString,
-				Computed: true,
+				Type:             schema.TypeString,
+				Computed:         true,
+				DiffSuppressFunc: suppressComposeDiff,
 			},
 			"rendered_rancher_compose": {
-				Type:     schema.TypeString,
-				Computed: true,
+				Type:             schema.TypeString,
+				Computed:         true,
+				DiffSuppressFunc: suppressComposeDiff,
 			},
 		},
 	}
@@ -99,13 +106,13 @@ func resourceRancherStackCreate(d *schema.ResourceData, meta interface{}) error 
 		return err
 	}
 
-	var newStack rancherClient.Environment
-	if err := client.Create("environment", data, &newStack); err != nil {
+	var newStack rancherClient.Stack
+	if err := client.Create("stack", data, &newStack); err != nil {
 		return err
 	}
 
 	stateConf := &resource.StateChangeConf{
-		Pending:    []string{"activating", "active", "removed", "removing"},
+		Pending:    []string{"activating"},
 		Target:     []string{"active"},
 		Refresh:    StackStateRefreshFunc(client, newStack.Id),
 		Timeout:    10 * time.Minute,
@@ -131,7 +138,7 @@ func resourceRancherStackRead(d *schema.ResourceData, meta interface{}) error {
 		return err
 	}
 
-	stack, err := client.Environment.ById(d.Id())
+	stack, err := client.Stack.ById(d.Id())
 	if err != nil {
 		return err
 	}
@@ -148,7 +155,7 @@ func resourceRancherStackRead(d *schema.ResourceData, meta interface{}) error {
 		return nil
 	}
 
-	config, err := client.Environment.ActionExportconfig(stack, &rancherClient.ComposeConfigInput{})
+	config, err := client.Stack.ActionExportconfig(stack, &rancherClient.ComposeConfigInput{})
 	if err != nil {
 		return err
 	}
@@ -205,18 +212,18 @@ func resourceRancherStackUpdate(d *schema.ResourceData, meta interface{}) error 
 		return err
 	}
 
-	stack, err := client.Environment.ById(d.Id())
+	stack, err := client.Stack.ById(d.Id())
 	if err != nil {
 		return err
 	}
 
-	var newStack rancherClient.Environment
-	if err = client.Update("environment", &stack.Resource, data, &newStack); err != nil {
+	var newStack rancherClient.Stack
+	if err = client.Update("stack", &stack.Resource, data, &newStack); err != nil {
 		return err
 	}
 
 	stateConf := &resource.StateChangeConf{
-		Pending:    []string{"active", "active-updating"},
+		Pending:    []string{"active", "active-updating", "upgraded"},
 		Target:     []string{"active"},
 		Refresh:    StackStateRefreshFunc(client, newStack.Id),
 		Timeout:    10 * time.Minute,
@@ -224,7 +231,7 @@ func resourceRancherStackUpdate(d *schema.ResourceData, meta interface{}) error 
 		MinTimeout: 3 * time.Second,
 	}
 	s, waitErr := stateConf.WaitForState()
-	stack = s.(*rancherClient.Environment)
+	stack = s.(*rancherClient.Stack)
 	if waitErr != nil {
 		return fmt.Errorf(
 			"Error waiting for stack (%s) to be updated: %s", stack.Id, waitErr)
@@ -244,7 +251,7 @@ func resourceRancherStackUpdate(d *schema.ResourceData, meta interface{}) error 
 			envValue := value
 			envMap[key] = &envValue
 		}
-		stack, err = client.Environment.ActionUpgrade(stack, &rancherClient.EnvironmentUpgrade{
+		stack, err = client.Stack.ActionUpgrade(stack, &rancherClient.StackUpgrade{
 			DockerCompose:  *data["dockerCompose"].(*string),
 			RancherCompose: *data["rancherCompose"].(*string),
 			Environment:    envMap,
@@ -255,7 +262,7 @@ func resourceRancherStackUpdate(d *schema.ResourceData, meta interface{}) error 
 		}
 
 		stateConf := &resource.StateChangeConf{
-			Pending:    []string{"active", "upgrading", "upgraded"},
+			Pending:    []string{"active", "upgrading", "upgraded", "finishing-upgrade"},
 			Target:     []string{"upgraded"},
 			Refresh:    StackStateRefreshFunc(client, stack.Id),
 			Timeout:    10 * time.Minute,
@@ -267,10 +274,10 @@ func resourceRancherStackUpdate(d *schema.ResourceData, meta interface{}) error 
 			return fmt.Errorf(
 				"Error waiting for stack (%s) to be upgraded: %s", stack.Id, waitErr)
 		}
-		stack = s.(*rancherClient.Environment)
+		stack = s.(*rancherClient.Stack)
 
 		if d.Get("finish_upgrade").(bool) {
-			stack, err = client.Environment.ActionFinishupgrade(stack)
+			stack, err = client.Stack.ActionFinishupgrade(stack)
 			if err != nil {
 				return err
 			}
@@ -311,12 +318,12 @@ func resourceRancherStackDelete(d *schema.ResourceData, meta interface{}) error 
 		return err
 	}
 
-	stack, err := client.Environment.ById(id)
+	stack, err := client.Stack.ById(id)
 	if err != nil {
 		return err
 	}
 
-	if err := client.Environment.Delete(stack); err != nil {
+	if err := client.Stack.Delete(stack); err != nil {
 		return fmt.Errorf("Error deleting Stack: %s", err)
 	}
 
@@ -351,7 +358,7 @@ func resourceRancherStackImport(d *schema.ResourceData, meta interface{}) ([]*sc
 		if err != nil {
 			return []*schema.ResourceData{}, err
 		}
-		stack, err := client.Environment.ById(d.Id())
+		stack, err := client.Stack.ById(d.Id())
 		if err != nil {
 			return []*schema.ResourceData{}, err
 		}
@@ -364,7 +371,7 @@ func resourceRancherStackImport(d *schema.ResourceData, meta interface{}) ([]*sc
 // a Rancher Stack.
 func StackStateRefreshFunc(client *rancherClient.RancherClient, stackID string) resource.StateRefreshFunc {
 	return func() (interface{}, string, error) {
-		stack, err := client.Environment.ById(stackID)
+		stack, err := client.Stack.ById(stackID)
 
 		if err != nil {
 			return nil, "", err
@@ -423,6 +430,7 @@ func makeStackData(d *schema.ResourceData, meta interface{}) (data map[string]in
 	environment = environmentFromMap(d.Get("environment").(map[string]interface{}))
 
 	startOnCreate := d.Get("start_on_create")
+	System := d.Get("system")
 
 	data = map[string]interface{}{
 		"name":           &name,
@@ -432,6 +440,7 @@ func makeStackData(d *schema.ResourceData, meta interface{}) (data map[string]in
 		"environment":    &environment,
 		"externalId":     &externalID,
 		"startOnCreate":  &startOnCreate,
+		"system":         &System,
 	}
 
 	return data, nil

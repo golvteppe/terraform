@@ -5,9 +5,9 @@ import (
 	"log"
 	"time"
 
+	rancherClient "github.com/golvteppe/go-rancher/v2"
 	"github.com/hashicorp/terraform/helper/resource"
 	"github.com/hashicorp/terraform/helper/schema"
-	rancherClient "github.com/rancher/go-rancher/client"
 )
 
 func resourceRancherRegistrationToken() *schema.Resource {

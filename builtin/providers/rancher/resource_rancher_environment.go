@@ -6,10 +6,10 @@ import (
 	"strings"
 	"time"
 
+	rancherClient "github.com/golvteppe/go-rancher/v2"
 	"github.com/hashicorp/terraform/helper/resource"
 	"github.com/hashicorp/terraform/helper/schema"
 	"github.com/hashicorp/terraform/helper/validation"
-	rancherClient "github.com/rancher/go-rancher/client"
 )
 
 func resourceRancherEnvironment() *schema.Resource {
@@ -116,7 +116,7 @@ func resourceRancherEnvironmentRead(d *schema.ResourceData, meta interface{}) er
 
 	d.Set("description", env.Description)
 	d.Set("name", env.Name)
-	d.Set("orchestration", getActiveOrchestration(env))
+	d.Set("orchestration", env.Orchestration)
 
 	return nil
 }
