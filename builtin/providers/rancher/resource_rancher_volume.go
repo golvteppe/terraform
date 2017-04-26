@@ -68,7 +68,7 @@ func resourceRancherVolumeCreate(d *schema.ResourceData, meta interface{}) error
 	}
 
 	stateConf := &resource.StateChangeConf{
-		Pending:    []string{"inactive", "removed", "removing"},
+		Pending:    []string{"inactive"},
 		Target:     []string{"inactive"},
 		Refresh:    VolumeStateRefreshFunc(client, newVolume.Id),
 		Timeout:    10 * time.Minute,
